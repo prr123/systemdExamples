@@ -14,12 +14,20 @@ import (
 )
 
 func getUnitStatus(ctx context.Context, servList [][]byte) ([]dbus.UnitStatus, error) {
+
 	conn, err := dbus.NewWithContext(ctx)
 	if err != nil {
 		log.Println(err)
 	}
 	defer conn.Close()
 
+//	fmt.Printf("servList: %v\n", servList)
+	if len(servList) == 0 {
+//		if servList[0][0] == '*' {
+		log.Printf("listing all units\n")
+		sliceOfUnitStatus, err := conn.ListUnitsContext(ctx) 
+		return sliceOfUnitStatus, err
+	}
 	//changed
 //	sliceOfUnits := []string{"systemd-networkd.service"}
 	sliceOfUnits := make([]string, len(servList))
@@ -62,10 +70,12 @@ func main() {
 	useStr := "./listUnits [service file1] [service file 2] ... [service file n]"
 	helpStr := "program that lists the status of systemd service units!"
 
+/*
 	if numArgs == 1 {
 		fmt.Printf("need a service file as argument!\n")
 		fmt.Printf("usage: %s\n", useStr)
 	}
+*/
 	if numArgs == 2 {
 		if os.Args[1] == "help" {
 			fmt.Printf("help: %s\n", helpStr)
@@ -74,31 +84,35 @@ func main() {
 		}
 	}
 
-	servList := make([][]byte, numArgs-1)
-	for i:=1; i< numArgs; i++ {
-		servList[i-1] = []byte(os.Args[i])
-	}
+	servList := [][]byte{}
 
-	for i, nam := range servList {
-		namlen := len(nam)
-//		fmt.Printf(" %q\n", nam[namlen-1])
-		if nam[namlen-1] == ',' {
-			nam = nam[:namlen-1]
-			servList[i] = nam
+	if numArgs > 1 {
+
+		servList = make([][]byte, numArgs-1)
+		for i:=1; i< numArgs; i++ {
+			servList[i-1] = []byte(os.Args[i])
 		}
+
+		for i, nam := range servList {
+			namlen := len(nam)
+//		fmt.Printf(" %q\n", nam[namlen-1])
+			if nam[namlen-1] == ',' {
+				nam = nam[:namlen-1]
+				servList[i] = nam
+			}
 //		fmt.Printf(" %s\n", nam)
 
-		idx := bytes.Index(nam, []byte(".service"))
-		if idx == -1 {
-			servList[i] = append(nam, []byte(".service")...)
+			idx := bytes.Index(nam, []byte(".service"))
+			if idx == -1 {
+				servList[i] = append(nam, []byte(".service")...)
+			}
+		}
+
+		for i, nam := range servList {
+			fmt.Printf("  %d: %s\n", i, nam)
 		}
 	}
 
-	for i, nam := range servList {
-		fmt.Printf("  %d: %s\n", i, nam)
-	}
-
-//	os.Exit(0)
 	ctx := context.TODO()
 	statusList, err := getUnitStatus(ctx, servList)
 	if err != nil {log.Fatalf("error -- getUnitStatus: %v", err)}
@@ -106,6 +120,4 @@ func main() {
 
 	PrintUnitStatus(statusList)
 
-//	fmt.Println(reflect.TypeOf(status))
-//	fmt.Println(status)
 }
